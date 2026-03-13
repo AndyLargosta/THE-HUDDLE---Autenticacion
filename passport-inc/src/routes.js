@@ -90,7 +90,7 @@ router.post("/login", async (req, res) => {
       const sessionId = uuidv4();
       const expiresAt = new Date(Date.now() + SESSION_HOURS * 3600000).toISOString();
 
-      db.prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+      db.prepare("INSERT INTO sessions (id, uid, expires_at) VALUES (?, ?, ?)")
         .run(sessionId, user.id, expiresAt);
 
       res.cookie("sessionId", sessionId, {
@@ -123,6 +123,7 @@ router.post("/login", async (req, res) => {
       csrfToken,
     });
   } catch (err) {
+    console.error("ERROR LOGIN:", err)
     res.status(500).json({ error: "Error al iniciar sesión" });
   }
 });

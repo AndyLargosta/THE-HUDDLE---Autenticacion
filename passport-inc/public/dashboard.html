@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — PassPort Inc.</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #eef0f4;
+      min-height: 100vh;
+    }
+
+    nav {
+      background: #1b2a4a;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    nav h1 { color: white; font-size: 1rem; }
+
+    nav button {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    nav button:hover { background: rgba(255,255,255,0.1); }
+
+    .content {
+      max-width: 700px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .card h2 {
+      font-size: 0.95rem;
+      color: #8a95a3;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #f0f2f5;
+      font-size: 0.9rem;
+    }
+
+    .info-row:last-child { border-bottom: none; }
+    .info-row span:first-child { color: #8a95a3; }
+    .info-row span:last-child { color: #1b2a4a; font-weight: 500; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .badge.user  { background: #eef0f4; color: #1b2a4a; }
+    .badge.admin { background: #1b2a4a; color: #ffffff !important; }
+
+    /* Tabla admin */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th {
+      text-align: left;
+      color: #8a95a3;
+      font-weight: 500;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid #e0e4ea;
+    }
+
+    td {
+      padding: 0.6rem 0.5rem;
+      border-bottom: 1px solid #f0f2f5;
+      color: #1b2a4a;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .btn-delete {
+      background: #fdf0f0;
+      color: #9b2020;
+      border: none;
+      padding: 0.3rem 0.7rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .btn-delete:hover { background: #f9d5d5; }
+
+    .message {
+      font-size: 0.85rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .message.error { background: #fdf0f0; color: #9b2020; display: block; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <h1>🛂 PassPort Inc.</h1>
+    <button onclick="logout()">Cerrar sesión</button>
+  </nav>
+
+  <div class="content">
+
+    <!-- Perfil -->
+    <div class="card">
+      <h2>Mi perfil</h2>
+      <div id="message" class="message"></div>
+      <div class="info-row">
+        <span>Email</span>
+        <span id="userEmail">—</span>
+      </div>
+      <div class="info-row">
+        <span>Rol</span>
+        <span id="userRole">—</span>
+      </div>
+      <div class="info-row">
+        <span>Modo de sesión</span>
+        <span id="sessionMode">—</span>
+      </div>
+    </div>
+
+    <!-- Panel admin -->
+    <div class="card" id="adminPanel" style="display:none">
+      <h2>Panel de administrador</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Intentos fallidos</th>
+            <th>Bloqueado hasta</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="usersTable"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const mode = localStorage.getItem('mode');
+    const token = localStorage.getItem('token');
+    const csrfToken = localStorage.getItem('csrfToken');
+
+    function getHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      if (mode === 'jwt' && token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+
+    function showMessage(text) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.className = 'message error';
+    }
+
+    async function loadProfile() {
+      const res = await fetch('/api/profile', {
+        headers: getHeaders(),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        showMessage('Sesión expirada. Redirigiendo...');
+        setTimeout(() => window.location.href = '/', 2000);
+        return;
+      }
+
+      const data = await res.json();
+      const user = data.user;
+
+      document.getElementById('userEmail').textContent = user.email;
+      document.getElementById('sessionMode').textContent = mode === 'jwt' ? 'JWT' : 'Cookie';
+      document.getElementById('userRole').innerHTML =
+        `<span class="badge ${user.role}">${user.role}</span>`;
+
+      if (user.role === 'admin') loadAdminPanel();
+    }
+
+    async function loadAdminPanel() {
+      document.getElementById('adminPanel').style.display = 'block';
+
+      const res = await fetch('/api/admin/users', {
+        headers: getHeaders(),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+      const tbody = document.getElementById('usersTable');
+      tbody.innerHTML = '';
+
+      data.users.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${u.email}</td>
+          <td><span class="badge ${u.role}">${u.role}</span></td>
+          <td>${u.login_attempts}</td>
+          <td>${u.locked_until ? new Date(u.locked_until).toLocaleString() : '—'}</td>
+          <td><button class="btn-delete" onclick="deleteUser('${u.id}')">Eliminar</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('¿Seguro que querés eliminar este usuario?')) return;
+
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: { ...getHeaders(), 'x-csrf-token': csrfToken },
+        credentials: 'include',
+      });
+
+      if (res.ok) loadAdminPanel();
+      else showMessage('Error al eliminar usuario');
+    }
+
+    async function logout() {
+      await fetch('/api/logout', {
+        method: 'POST',
+        headers: getHeaders(),
+        credentials: 'include',
+      });
+
+      localStorage.clear();
+      window.location.href = '/';
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
